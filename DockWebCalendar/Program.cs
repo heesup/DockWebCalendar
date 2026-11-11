@@ -103,7 +103,19 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
         ToggleSignal.Listen(_host.Toggle);
 
         var toggle = new ToggleCommand(_host);
-        _bandItem = new ListItem(toggle) { Icon = new IconInfo(""), Title = DateText() };
+
+        // Settings live in the context menu (right-click the Dock band, or the command's
+        // "more" menu in the palette) rather than as a second entry in the command list.
+        IContextItem[] contextCommands =
+        [
+            new CommandContextItem(_settings.ToolkitSettings.SettingsPage)
+            {
+                Title = "Settings",
+                Subtitle = "Keep or close the browser after the panel closes",
+                Icon = new IconInfo(""),
+            },
+        ];
+        _bandItem = new ListItem(toggle) { Icon = new IconInfo(""), Title = DateText(), MoreCommands = contextCommands };
         _dockItem = new WrappedDockItem([_bandItem], "dockwebcalendar.dock.calendar", Program.ProductName);
         _commands =
         [
@@ -111,13 +123,8 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
             {
                 Title = Program.ProductName,
                 Subtitle = "Google Calendar",
+                MoreCommands = contextCommands,
                 Icon = new IconInfo(""),
-            },
-            new CommandItem(_settings.ToolkitSettings.SettingsPage)
-            {
-                Title = $"{Program.ProductName} settings",
-                Subtitle = "Keep or close the browser after the panel closes",
-                Icon = new IconInfo(""),
             },
         ];
 

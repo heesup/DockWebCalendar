@@ -33,7 +33,7 @@ Then add the **Dock Web Calendar** band under Command Palette **Settings → Doc
 
 ## Settings
 
-Open Command Palette and run **Dock Web Calendar settings**, or go to Command Palette **Settings → Extensions → Dock Web Calendar**.
+Right-click the **Dock Web Calendar** band on the Dock and choose **Settings**. The same entry is in the context menu of the **Dock Web Calendar** command in the palette, and under Command Palette **Settings → Extensions → Dock Web Calendar**. The context menu belongs to the extension's band; an app icon pinned to the Dock does not have it.
 
 | After the panel closes | Memory | Opening |
 |---|---|---|
