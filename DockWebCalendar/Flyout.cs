@@ -74,16 +74,26 @@ internal sealed class FlyoutWindow : Window
     private const string CalendarUrl = "https://calendar.google.com/calendar/u/0/r";
     private const string SignInUrl = "https://accounts.google.com/ServiceLogin?service=cl&continue=https%3A%2F%2Fcalendar.google.com%2Fcalendar%2Fu%2F0%2Fr";
 
-    // Width of the side panel in device-independent pixels; the height is the whole work area.
-    private const double PanelWidth = 520;
+    // Panel widths in device-independent pixels; the height is the whole work area.
+    private const double DefaultPanelWidth = 640;
+    private const double MinPanelWidth = 380;
+    private const double GripWidth = 6;
+
+    // Google Calendar's desktop layout needs about this many CSS pixels across before
+    // its header and side menu stop being cut off. A narrower panel is zoomed out to fit.
+    private const double PageLayoutWidth = 960;
+    private const double MinZoom = 0.5;
 
     // A click on the Dock band first takes focus away (which hides the flyout) and then
     // asks to toggle it. Ignoring a toggle this soon after a hide keeps it closed.
     private static readonly TimeSpan ReopenGuard = TimeSpan.FromMilliseconds(400);
 
     // Cookies and the Google sign-in live here, separate from any installed browser.
-    private static readonly string UserDataFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DockWebCalendar", "WebView2");
+    private static readonly string DataFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DockWebCalendar");
+
+    private static readonly string UserDataFolder = Path.Combine(DataFolder, "WebView2");
+    private static readonly string WidthFile = Path.Combine(DataFolder, "panel-width.txt");
 
     private readonly bool _pinned;
     private readonly WebView2 _web = new();
@@ -91,6 +101,7 @@ internal sealed class FlyoutWindow : Window
     private DateTime _hiddenAt = DateTime.MinValue;
     private bool _browserStarted;
     private bool _signingIn;
+    private double _panelWidth = LoadPanelWidth();
 
     public FlyoutWindow(bool pinned)
     {
@@ -100,7 +111,34 @@ internal sealed class FlyoutWindow : Window
         ResizeMode = ResizeMode.NoResize;
         ShowInTaskbar = false;
         Topmost = true;
-        Content = _web;
+
+        // The browser is a separate child window that swallows mouse input, so the
+        // resize grip is a strip of the panel's own surface to its left.
+        var grip = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0x30, 0x80, 0x80, 0x80)),
+            Cursor = System.Windows.Input.Cursors.SizeWE,
+            ToolTip = "Drag to resize",
+        };
+        grip.MouseLeftButtonDown += (_, args) => { grip.CaptureMouse(); args.Handled = true; };
+        grip.MouseMove += (_, _) => { if (grip.IsMouseCaptured) { ResizeToPointer(); } };
+        grip.MouseLeftButtonUp += (_, _) =>
+        {
+            if (grip.IsMouseCaptured)
+            {
+                grip.ReleaseMouseCapture();
+                SavePanelWidth();
+            }
+        };
+
+        var layout = new Grid();
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(GripWidth) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(_web, 1);
+        layout.Children.Add(grip);
+        layout.Children.Add(_web);
+        Content = layout;
+        SizeChanged += (_, _) => ApplyZoom();
     }
 
     /// <summary>Raised after the flyout has been hidden.</summary>
@@ -205,6 +243,7 @@ internal sealed class FlyoutWindow : Window
             core.NewWindowRequested += OnNewWindowRequested;
             core.NavigationStarting += OnNavigationStarting;
             core.SourceChanged += OnSourceChanged;
+            ApplyZoom();
             core.Navigate(CalendarUrl);
         }
         catch (Exception exception)
@@ -269,8 +308,65 @@ internal sealed class FlyoutWindow : Window
     private void Place(IntPtr handle)
     {
         var (_, work, scale) = Native.MonitorAt(_anchor);
-        var width = Math.Min((int)Math.Round(PanelWidth * scale), work.Width);
+        var width = Math.Min((int)Math.Round(_panelWidth * scale), work.Width);
         Native.MoveWindow(handle, work.Right - width, work.Top, width, work.Height);
+    }
+
+    /// <summary>While the grip is dragged, the panel's left edge follows the pointer.</summary>
+    private void ResizeToPointer()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var (_, work, scale) = Native.MonitorAt(_anchor);
+        var minimum = (int)Math.Round(MinPanelWidth * scale);
+        var width = Math.Clamp(work.Right - Native.CursorPosition().X, Math.Min(minimum, work.Width), work.Width);
+        _panelWidth = width / scale;
+        Native.MoveWindow(handle, work.Right - width, work.Top, width, work.Height);
+    }
+
+    /// <summary>
+    /// Zooms the page out when the panel is narrower than the layout Google Calendar
+    /// needs, so the whole page fits instead of being cut off at the sides.
+    /// </summary>
+    private void ApplyZoom()
+    {
+        if (_web.CoreWebView2 is null || ActualWidth <= GripWidth)
+        {
+            return;
+        }
+
+        _web.ZoomFactor = Math.Clamp((ActualWidth - GripWidth) / PageLayoutWidth, MinZoom, 1.0);
+    }
+
+    private static double LoadPanelWidth()
+    {
+        try
+        {
+            if (File.Exists(WidthFile) &&
+                double.TryParse(File.ReadAllText(WidthFile), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var width) &&
+                width >= MinPanelWidth && width <= 10000)
+            {
+                return width;
+            }
+        }
+        catch (Exception)
+        {
+            // An unreadable file falls back to the default width.
+        }
+
+        return DefaultPanelWidth;
+    }
+
+    private void SavePanelWidth()
+    {
+        try
+        {
+            Directory.CreateDirectory(DataFolder);
+            File.WriteAllText(WidthFile, _panelWidth.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        catch (Exception)
+        {
+            // The width is only a convenience; the panel still works at this size.
+        }
     }
 
     private static bool IsDarkTheme()

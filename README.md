@@ -24,11 +24,10 @@ Then add the **Dock Web Calendar** band under Command Palette **Settings → Doc
 
 - Click the band to open the panel. The first time, it shows the Google sign-in form; after one sign-in you stay signed in.
 - To close it, click outside the panel or click the band again. While a Google sign-in page is showing, the panel stays open when it loses focus, so a passkey prompt, password manager or code app does not interrupt the sign-in; close it with the band or `Alt+F4`.
-- Views are switched with Google Calendar's own shortcuts: `M` month, `W` week, `D` day, `A` schedule, `T` today. The panel is narrow, so the **Day** and **Schedule** views fit best. Google remembers the view you used last.
+- Views are switched with Google Calendar's own shortcuts: `M` month, `W` week, `D` day, `A` schedule, `T` today. Google remembers the view you used last.
 - Once created, the panel is kept when closed, so it reopens at once on the page as you left it.
 - Links that want a new window, such as a Meet call or an attachment, open in your default browser.
-
-The panel width is `PanelWidth` in `DockWebCalendar/Flyout.cs` (520 by default).
+- Drag the strip on the panel's left edge to resize it; the width is remembered. Google Calendar's desktop page needs about 960 pixels across, so a narrower panel is zoomed out to fit instead of cutting the page off at the sides. Widen the panel for larger text.
 
 ## Run without Command Palette
 
