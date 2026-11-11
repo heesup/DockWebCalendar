@@ -10,6 +10,35 @@ The panel on first run, before signing in. It is docked to the right edge and as
 
 <img src="screenshots/sign-in.png" alt="The full-height side panel showing the Google sign-in form for Google Calendar" width="320">
 
+## Development setup
+
+There is no installer yet, so the extension is built from source.
+
+| Needed | Why | `setup.ps1` installs it |
+|---|---|---|
+| Windows 11 | The Dock and the window styling | no |
+| .NET 10 SDK, `10.0.401` or a later 10.0 feature band | Builds the project | yes |
+| Developer Mode | `build-and-install.ps1` registers an unsigned development package | turns it on when run as administrator |
+| PowerToys with Command Palette 0.9 or newer, Dock enabled | Hosts the extension | yes |
+| Microsoft Edge WebView2 runtime | Shows the Google Calendar page; part of Windows 11 | yes |
+
+```powershell
+./setup.ps1 -CheckOnly   # report what is missing, change nothing
+./setup.ps1              # install what is missing with winget
+```
+
+The Windows SDK is not needed. The project targets `net10.0-windows10.0.26100.0`, and the .NET SDK takes the Windows API reference assemblies from the `Microsoft.Windows.SDK.NET.Ref` NuGet package during restore; a full rebuild never touches an installed Windows SDK. It is only useful for packing and signing an `.msix` yourself with `makeappx.exe` and `signtool.exe`, and `./setup.ps1 -WithWindowsSdk` installs it for that.
+
+To build without installing, run `./build.ps1`.
+
+## Install
+
+```powershell
+./build-and-install.ps1
+```
+
+This builds, publishes, registers the package for the current user in development mode and restarts Command Palette. Then add the **Dock Web Calendar** band under Command Palette **Settings → Dock → Bands**. Enabling the extension does not put the band on the Dock by itself.
+
 ## Use
 
 - Click the band to open the panel. The first time, it shows the Google sign-in form; after one sign-in you stay signed in.
