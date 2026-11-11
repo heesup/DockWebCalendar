@@ -97,6 +97,12 @@ internal sealed class FlyoutWindow : Window
     // asks to toggle it. Ignoring a toggle this soon after a hide keeps it closed.
     private static readonly TimeSpan ReopenGuard = TimeSpan.FromMilliseconds(400);
 
+    // Command Palette can take longer than that to deliver the click, so the same click
+    // is also recognised by where it happened: the pointer has not moved since the
+    // window lost focus.
+    private static readonly TimeSpan SameClickWindow = TimeSpan.FromSeconds(1.5);
+    private const int SameClickDistance = 6;
+
     // Cookies and the Google sign-in live here, separate from any installed browser.
     private static readonly string DataFolder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DockWebCalendar");
@@ -108,6 +114,8 @@ internal sealed class FlyoutWindow : Window
     private readonly WebView2 _web = new();
     private Native.POINT _anchor;
     private DateTime _hiddenAt = DateTime.MinValue;
+    private DateTime _focusLostAt = DateTime.MinValue;
+    private Native.POINT _focusLostCursor;
     private bool _browserStarted;
     private bool _signingIn;
 
@@ -189,7 +197,7 @@ internal sealed class FlyoutWindow : Window
             return;
         }
 
-        if (DateTime.UtcNow - _hiddenAt < ReopenGuard)
+        if (DateTime.UtcNow - _hiddenAt < ReopenGuard || IsClickThatClosedIt(cursor))
         {
             return;
         }
@@ -235,9 +243,17 @@ internal sealed class FlyoutWindow : Window
         Hidden?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>True when this toggle comes from the very click that took focus away and hid the window.</summary>
+    private bool IsClickThatClosedIt(Native.POINT cursor) =>
+        DateTime.UtcNow - _focusLostAt < SameClickWindow &&
+        Math.Abs(cursor.X - _focusLostCursor.X) <= SameClickDistance &&
+        Math.Abs(cursor.Y - _focusLostCursor.Y) <= SameClickDistance;
+
     protected override void OnDeactivated(EventArgs e)
     {
         base.OnDeactivated(e);
+        _focusLostAt = DateTime.UtcNow;
+        _focusLostCursor = Native.CursorPosition();
 
         // Signing in takes focus away more than once: a passkey or Windows Hello prompt,
         // a password manager, a phone-code app. Hiding then would abandon the sign-in,
