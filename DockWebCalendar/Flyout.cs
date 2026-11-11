@@ -77,9 +77,8 @@ internal sealed class FlyoutWindow : Window
     // Panel widths in device-independent pixels; the height is the whole work area.
     private const double MinPanelWidth = 380;
 
-    // Blank margin on each side of the page, so its content does not touch the panel
-    // edges. The left one doubles as the resize grip.
-    private const double SidePadding = 12;
+    // A thin strip on the left edge for resizing; the page fills everything else.
+    private const double GripWidth = 5;
 
     // Google Calendar's desktop layout needs about this many CSS pixels across before
     // its header and side menu stop being cut off. A narrower panel is zoomed out to fit.
@@ -142,9 +141,8 @@ internal sealed class FlyoutWindow : Window
         };
 
         var layout = new Grid();
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SidePadding) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(GripWidth) });
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SidePadding) });
         Grid.SetColumn(_web, 1);
         layout.Children.Add(grip);
         layout.Children.Add(_web);
@@ -176,7 +174,7 @@ internal sealed class FlyoutWindow : Window
     {
         var dark = IsDarkTheme();
 
-        // Google Calendar's page background, so the side margins blend into the page.
+        // Google Calendar's page background, so the grip strip blends into the page.
         Background = new SolidColorBrush(dark ? Color.FromRgb(0x1B, 0x1B, 0x1B) : Color.FromRgb(0xF8, 0xFA, 0xFD));
 
         var handle = new WindowInteropHelper(this).EnsureHandle();
@@ -334,7 +332,7 @@ internal sealed class FlyoutWindow : Window
     private static double DefaultPanelWidth(double panelHeight)
     {
         var zoom = Math.Clamp(panelHeight / PageGridHeight, MinZoom, 1.0);
-        return (PageLayoutWidth * zoom) + (2 * SidePadding);
+        return (PageLayoutWidth * zoom) + GripWidth;
     }
 
     /// <summary>While the grip is dragged, the panel's left edge follows the pointer.</summary>
@@ -354,7 +352,7 @@ internal sealed class FlyoutWindow : Window
     /// </summary>
     private void ApplyZoom()
     {
-        if (_web.CoreWebView2 is null || ActualWidth <= 2 * SidePadding)
+        if (_web.CoreWebView2 is null || ActualWidth <= GripWidth)
         {
             return;
         }
@@ -362,7 +360,7 @@ internal sealed class FlyoutWindow : Window
         // Never zoom out past the point where the hour grid stops reaching the bottom.
         // In a panel too narrow for that, Google Calendar switches to its own compact
         // layout (fewer header buttons, a week grid that scrolls sideways).
-        var fitWidth = (ActualWidth - (2 * SidePadding)) / PageLayoutWidth;
+        var fitWidth = (ActualWidth - GripWidth) / PageLayoutWidth;
         var fillHeight = ActualHeight / PageGridHeight;
         _web.ZoomFactor = Math.Clamp(Math.Max(fitWidth, fillHeight), MinZoom, 1.0);
     }
