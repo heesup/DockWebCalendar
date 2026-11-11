@@ -18,6 +18,7 @@ internal sealed class FlyoutHost
 {
     private readonly bool _pinned;
     private readonly bool _exitWhenHidden;
+    private readonly Func<TimeSpan?> _keepBrowserFor;
     private readonly ManualResetEventSlim _ready = new();
     private Thread? _thread;
     private Dispatcher? _dispatcher;
@@ -25,10 +26,13 @@ internal sealed class FlyoutHost
 
     /// <param name="pinned">Stay open when the window loses focus.</param>
     /// <param name="exitWhenHidden">Standalone run: closing the flyout ends the process.</param>
-    public FlyoutHost(bool pinned, bool exitWhenHidden)
+    /// <param name="keepBrowserFor">How long to keep the browser after the panel closes;
+    /// zero closes it at once, null keeps it.</param>
+    public FlyoutHost(bool pinned, bool exitWhenHidden, Func<TimeSpan?>? keepBrowserFor = null)
     {
         _pinned = pinned;
         _exitWhenHidden = exitWhenHidden;
+        _keepBrowserFor = keepBrowserFor ?? (() => null);
     }
 
     public void Start()
@@ -54,7 +58,7 @@ internal sealed class FlyoutHost
     {
         var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         _dispatcher = Dispatcher.CurrentDispatcher;
-        _window = new FlyoutWindow(_pinned);
+        _window = new FlyoutWindow(_pinned, _keepBrowserFor);
         if (_exitWhenHidden)
         {
             _window.Hidden += (_, _) => application.Shutdown();
@@ -111,7 +115,10 @@ internal sealed class FlyoutWindow : Window
     private static readonly string WidthFile = Path.Combine(DataFolder, "panel-width.txt");
 
     private readonly bool _pinned;
-    private readonly WebView2 _web = new();
+    private readonly Func<TimeSpan?> _keepBrowserFor;
+    private readonly Grid _layout = new();
+    private readonly DispatcherTimer _releaseTimer = new();
+    private WebView2 _web = new();
     private Native.POINT _anchor;
     private DateTime _hiddenAt = DateTime.MinValue;
     private DateTime _focusLostAt = DateTime.MinValue;
@@ -122,9 +129,11 @@ internal sealed class FlyoutWindow : Window
     // Null until the user has resized the panel.
     private double? _panelWidth = LoadPanelWidth();
 
-    public FlyoutWindow(bool pinned)
+    public FlyoutWindow(bool pinned, Func<TimeSpan?> keepBrowserFor)
     {
         _pinned = pinned;
+        _keepBrowserFor = keepBrowserFor;
+        _releaseTimer.Tick += (_, _) => ReleaseBrowser();
         Title = Program.ProductName;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -176,13 +185,12 @@ internal sealed class FlyoutWindow : Window
             }
         };
 
-        var layout = new Grid();
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(GripWidth) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(GripWidth) });
+        _layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         Grid.SetColumn(_web, 1);
-        layout.Children.Add(grip);
-        layout.Children.Add(_web);
-        Content = layout;
+        _layout.Children.Add(grip);
+        _layout.Children.Add(_web);
+        Content = _layout;
         SizeChanged += (_, _) => ApplyZoom();
     }
 
@@ -226,11 +234,62 @@ internal sealed class FlyoutWindow : Window
         Activate();
         _web.Focus();
 
+        _releaseTimer.Stop();
         if (!_browserStarted)
         {
             _browserStarted = true;
             _ = StartBrowserAsync(dark);
         }
+    }
+
+    /// <summary>
+    /// After the panel closes: shut the browser down now, later, or never, as chosen in
+    /// the extension's settings.
+    /// </summary>
+    private void ScheduleBrowserRelease()
+    {
+        _releaseTimer.Stop();
+        var keep = _keepBrowserFor();
+        if (keep is null || !_browserStarted)
+        {
+            return;
+        }
+
+        if (keep.Value <= TimeSpan.Zero)
+        {
+            ReleaseBrowser();
+            return;
+        }
+
+        _releaseTimer.Interval = keep.Value;
+        _releaseTimer.Start();
+    }
+
+    /// <summary>
+    /// Disposes the WebView2, which ends its browser processes and frees their memory.
+    /// The sign-in survives in the profile folder; the next open starts a new browser.
+    /// </summary>
+    private void ReleaseBrowser()
+    {
+        _releaseTimer.Stop();
+        if (!_browserStarted || IsVisible)
+        {
+            return;
+        }
+
+        var old = _web;
+        _layout.Children.Remove(old);
+        old.Dispose();
+
+        _web = new WebView2();
+        Grid.SetColumn(_web, 1);
+        _layout.Children.Add(_web);
+        _browserStarted = false;
+        _signingIn = false;
+        Topmost = true;
+
+        // The error message replaces the content when the browser could not start.
+        Content = _layout;
     }
 
     private void HideFlyout()
@@ -242,6 +301,7 @@ internal sealed class FlyoutWindow : Window
 
         Hide();
         _hiddenAt = DateTime.UtcNow;
+        ScheduleBrowserRelease();
         Hidden?.Invoke(this, EventArgs.Empty);
     }
 

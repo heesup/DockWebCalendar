@@ -48,7 +48,8 @@ public static class Program
         }
 
         // Otherwise this process becomes the one that stays and owns the panel.
-        var host = new FlyoutHost(pinned: false, exitWhenHidden: false);
+        var settings = new PanelSettings(PanelSettings.DefaultPath);
+        var host = new FlyoutHost(pinned: false, exitWhenHidden: false, () => settings.KeepBrowserFor);
         host.Start();
         ToggleSignal.Listen(host.Toggle);
         host.Toggle();
@@ -80,6 +81,7 @@ public sealed partial class DockWebCalendarExtension : IExtension, IDisposable
 
 public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, IDisposable
 {
+    private readonly PanelSettings _settings;
     private readonly FlyoutHost _host;
     private readonly ListItem _bandItem;
     private readonly WrappedDockItem _dockItem;
@@ -92,7 +94,10 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
         DisplayName = Program.ProductName;
         Icon = new IconInfo("");
 
-        _host = new FlyoutHost(pinned: false, exitWhenHidden: false);
+        _settings = new PanelSettings(PanelSettings.DefaultPath);
+        Settings = _settings.ToolkitSettings;
+
+        _host = new FlyoutHost(pinned: false, exitWhenHidden: false, () => _settings.KeepBrowserFor);
         _host.Start();
 
         ToggleSignal.Listen(_host.Toggle);
@@ -107,6 +112,12 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
                 Title = Program.ProductName,
                 Subtitle = "Google Calendar",
                 Icon = new IconInfo(""),
+            },
+            new CommandItem(_settings.ToolkitSettings.SettingsPage)
+            {
+                Title = $"{Program.ProductName} settings",
+                Subtitle = "Keep or close the browser after the panel closes",
+                Icon = new IconInfo(""),
             },
         ];
 
