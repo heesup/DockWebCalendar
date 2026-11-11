@@ -10,18 +10,6 @@ The panel on first run, before signing in. It is docked to the right edge and as
 
 <img src="screenshots/sign-in.png" alt="The full-height side panel showing the Google sign-in form for Google Calendar" width="320">
 
-## Install
-
-Requirements: Windows 11, PowerToys Command Palette 0.9 or newer with the Dock enabled, and the .NET 10 SDK (`10.0.401` or later). The WebView2 runtime ships with Windows 11.
-
-To check the machine and install what is missing (the .NET 10 SDK, Developer Mode, PowerToys), run `./setup.ps1` first; `./setup.ps1 -CheckOnly` only reports. The Windows SDK is not needed to build.
-
-```powershell
-./build-and-install.ps1
-```
-
-Then add the **Dock Web Calendar** band under Command Palette **Settings → Dock → Bands**.
-
 ## Use
 
 - Click the band to open the panel. The first time, it shows the Google sign-in form; after one sign-in you stay signed in.
