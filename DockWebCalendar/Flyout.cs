@@ -77,8 +77,11 @@ internal sealed class FlyoutWindow : Window
     // Panel widths in device-independent pixels; the height is the whole work area.
     private const double MinPanelWidth = 380;
 
-    // A thin strip on the left edge for resizing; the page fills everything else.
-    private const double GripWidth = 5;
+    // Until the user resizes the panel: the width the desktop page needs at full size.
+    private const double DefaultPanelWidth = PageLayoutWidth + GripWidth;
+
+    // The strip on the left edge for resizing; the page fills everything else.
+    private const double GripWidth = 10;
 
     // Google Calendar's desktop layout needs about this many CSS pixels across before
     // its header and side menu stop being cut off. A narrower panel is zoomed out to fit.
@@ -108,7 +111,7 @@ internal sealed class FlyoutWindow : Window
     private bool _browserStarted;
     private bool _signingIn;
 
-    // Null until the user has resized the panel; the default then depends on the screen.
+    // Null until the user has resized the panel.
     private double? _panelWidth = LoadPanelWidth();
 
     public FlyoutWindow(bool pinned)
@@ -122,13 +125,37 @@ internal sealed class FlyoutWindow : Window
 
         // The browser is a separate child window that swallows mouse input, so the
         // resize grip is a strip of the panel's own surface to its left.
+        // Two short bars in the middle of the strip show that it can be dragged.
+        var handle = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var barBrush = new SolidColorBrush(Color.FromArgb(0xB0, 0x80, 0x80, 0x80));
+        for (var index = 0; index < 2; index++)
+        {
+            handle.Children.Add(new Border
+            {
+                Width = 2,
+                Height = 36,
+                CornerRadius = new CornerRadius(1),
+                Margin = new Thickness(1, 0, 1, 0),
+                Background = barBrush,
+            });
+        }
+
+        var hoverBrush = new SolidColorBrush(Color.FromArgb(0x30, 0x80, 0x80, 0x80));
         var grip = new Border
         {
             // Transparent, not null: an element without a background gets no mouse input.
             Background = Brushes.Transparent,
             Cursor = System.Windows.Input.Cursors.SizeWE,
             ToolTip = "Drag to resize",
+            Child = handle,
         };
+        grip.MouseEnter += (_, _) => grip.Background = hoverBrush;
+        grip.MouseLeave += (_, _) => { if (!grip.IsMouseCaptured) { grip.Background = Brushes.Transparent; } };
         grip.MouseLeftButtonDown += (_, args) => { grip.CaptureMouse(); args.Handled = true; };
         grip.MouseMove += (_, _) => { if (grip.IsMouseCaptured) { ResizeToPointer(); } };
         grip.MouseLeftButtonUp += (_, _) =>
@@ -136,6 +163,7 @@ internal sealed class FlyoutWindow : Window
             if (grip.IsMouseCaptured)
             {
                 grip.ReleaseMouseCapture();
+                grip.Background = grip.IsMouseOver ? hoverBrush : Brushes.Transparent;
                 SavePanelWidth();
             }
         };
@@ -319,20 +347,9 @@ internal sealed class FlyoutWindow : Window
     private void Place(IntPtr handle)
     {
         var (_, work, scale) = Native.MonitorAt(_anchor);
-        var panelWidth = _panelWidth ?? DefaultPanelWidth(work.Height / scale);
+        var panelWidth = _panelWidth ?? DefaultPanelWidth;
         var width = Math.Min((int)Math.Round(panelWidth * scale), work.Width);
         Native.MoveWindow(handle, work.Right - width, work.Top, width, work.Height);
-    }
-
-    /// <summary>
-    /// The narrowest width at which the page both fits across and fills the panel from
-    /// top to bottom: the zoom that makes the hour grid as tall as the panel, applied to
-    /// the width the page layout needs.
-    /// </summary>
-    private static double DefaultPanelWidth(double panelHeight)
-    {
-        var zoom = Math.Clamp(panelHeight / PageGridHeight, MinZoom, 1.0);
-        return (PageLayoutWidth * zoom) + GripWidth;
     }
 
     /// <summary>While the grip is dragged, the panel's left edge follows the pointer.</summary>
