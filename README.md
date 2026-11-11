@@ -14,6 +14,8 @@ The panel on first run, before signing in. It is docked to the right edge and as
 
 Requirements: Windows 11, PowerToys Command Palette 0.9 or newer with the Dock enabled, and the .NET 10 SDK (`10.0.401` or later). The WebView2 runtime ships with Windows 11.
 
+To check the machine and install what is missing (the .NET 10 SDK, Developer Mode, PowerToys), run `./setup.ps1` first; `./setup.ps1 -CheckOnly` only reports. The Windows SDK is not needed to build.
+
 ```powershell
 ./build-and-install.ps1
 ```
@@ -43,6 +45,10 @@ dotnet run --project DockWebCalendar -c Release -- --pin
 - The sign-in (cookies) is stored in `%LocalAppData%\DockWebCalendar\WebView2`, separate from Edge and Chrome. To sign out, sign out of the Google account inside the panel or delete that folder.
 - Google sometimes blocks sign-in from embedded browsers as "not secure". WebView2 usually passes, but that is up to Google's policy.
 - The WebView2 processes start the first time the panel opens and stay in memory while Command Palette is running.
+
+## Pinning the app instead of the band
+
+- The app itself can also be pinned to the Dock or Start. Each click then starts the exe, which only signals the running extension to open or close its window and exits, so there is still a single window. The **Dock Web Calendar** band is the better choice: it shows the date and needs no extra process per click.
 
 ## License
 

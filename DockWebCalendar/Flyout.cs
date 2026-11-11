@@ -220,6 +220,8 @@ internal sealed class FlyoutWindow : Window
         Place(handle);
         Show();
         Place(handle);
+        _shownAt = DateTime.UtcNow;
+        _refocused = false;
         Native.ForceForeground(handle);
         Activate();
         _web.Focus();
@@ -243,6 +245,31 @@ internal sealed class FlyoutWindow : Window
         Hidden?.Invoke(this, EventArgs.Empty);
     }
 
+    // Right after opening, focus can be pulled away again by whatever was clicked to open
+    // the window (the Dock re-activating itself, or a launcher process ending). That is
+    // not the user leaving, so the window takes focus back once instead of closing.
+    private static readonly TimeSpan OpeningGrace = TimeSpan.FromMilliseconds(700);
+    private DateTime _shownAt = DateTime.MinValue;
+    private bool _refocused;
+
+    private bool RefocusIfJustOpened()
+    {
+        if (_refocused || DateTime.UtcNow - _shownAt > OpeningGrace)
+        {
+            return false;
+        }
+
+        _refocused = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (IsVisible)
+            {
+                Native.ForceForeground(new WindowInteropHelper(this).Handle);
+                Activate();
+            }
+        });
+        return true;
+    }
     /// <summary>True when this toggle comes from the very click that took focus away and hid the window.</summary>
     private bool IsClickThatClosedIt(Native.POINT cursor) =>
         DateTime.UtcNow - _focusLostAt < SameClickWindow &&
@@ -254,11 +281,10 @@ internal sealed class FlyoutWindow : Window
         base.OnDeactivated(e);
         _focusLostAt = DateTime.UtcNow;
         _focusLostCursor = Native.CursorPosition();
-
         // Signing in takes focus away more than once: a passkey or Windows Hello prompt,
         // a password manager, a phone-code app. Hiding then would abandon the sign-in,
         // so the panel stays until it is toggled from the Dock or closed with Alt+F4.
-        if (!_pinned && !_signingIn)
+        if (!_pinned && !_signingIn && !RefocusIfJustOpened())
         {
             HideFlyout();
         }

@@ -29,10 +29,28 @@ public static class Program
             return 0;
         }
 
-        // Started by hand: show the flyout without Command Palette.
+        // Development run: a throwaway panel that ends the process when it closes.
         //   --pin    stay open when the window loses focus
-        var host = new FlyoutHost(pinned: args.Contains("--pin"), exitWhenHidden: true);
+        if (args.Contains("--pin"))
+        {
+            var pinned = new FlyoutHost(pinned: true, exitWhenHidden: true);
+            pinned.Start();
+            pinned.Toggle();
+            pinned.WaitForExit();
+            return 0;
+        }
+
+        // Started as an app, for example from an icon pinned to the Dock or Start. If the
+        // extension (or an earlier launch) is running, it owns the panel: toggle that one.
+        if (ToggleSignal.TrySignalRunningInstance())
+        {
+            return 0;
+        }
+
+        // Otherwise this process becomes the one that stays and owns the panel.
+        var host = new FlyoutHost(pinned: false, exitWhenHidden: false);
         host.Start();
+        ToggleSignal.Listen(host.Toggle);
         host.Toggle();
         host.WaitForExit();
         return 0;
@@ -76,6 +94,8 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
 
         _host = new FlyoutHost(pinned: false, exitWhenHidden: false);
         _host.Start();
+
+        ToggleSignal.Listen(_host.Toggle);
 
         var toggle = new ToggleCommand(_host);
         _bandItem = new ListItem(toggle) { Icon = new IconInfo(""), Title = DateText() };
