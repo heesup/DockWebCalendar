@@ -90,6 +90,7 @@ internal sealed class FlyoutWindow : Window
     private Native.POINT _anchor;
     private DateTime _hiddenAt = DateTime.MinValue;
     private bool _browserStarted;
+    private bool _signingIn;
 
     public FlyoutWindow(bool pinned)
     {
@@ -160,10 +161,29 @@ internal sealed class FlyoutWindow : Window
     protected override void OnDeactivated(EventArgs e)
     {
         base.OnDeactivated(e);
-        if (!_pinned)
+
+        // Signing in takes focus away more than once: a passkey or Windows Hello prompt,
+        // a password manager, a phone-code app. Hiding then would abandon the sign-in,
+        // so the panel stays until it is toggled from the Dock or closed with Alt+F4.
+        if (!_pinned && !_signingIn)
         {
             HideFlyout();
         }
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        // Alt+F4 hides the panel; the browser and its session are kept for the next click.
+        e.Cancel = true;
+        HideFlyout();
+    }
+
+    private void OnSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs args)
+    {
+        _signingIn = _web.Source?.Host == "accounts.google.com";
+
+        // A topmost panel could cover the system's own sign-in prompts.
+        Topmost = !_signingIn;
     }
 
     private async Task StartBrowserAsync(bool dark)
@@ -184,6 +204,7 @@ internal sealed class FlyoutWindow : Window
             core.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto;
             core.NewWindowRequested += OnNewWindowRequested;
             core.NavigationStarting += OnNavigationStarting;
+            core.SourceChanged += OnSourceChanged;
             core.Navigate(CalendarUrl);
         }
         catch (Exception exception)
