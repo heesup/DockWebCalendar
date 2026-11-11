@@ -75,13 +75,20 @@ internal sealed class FlyoutWindow : Window
     private const string SignInUrl = "https://accounts.google.com/ServiceLogin?service=cl&continue=https%3A%2F%2Fcalendar.google.com%2Fcalendar%2Fu%2F0%2Fr";
 
     // Panel widths in device-independent pixels; the height is the whole work area.
-    private const double DefaultPanelWidth = 640;
     private const double MinPanelWidth = 380;
-    private const double GripWidth = 6;
+
+    // Blank margin on each side of the page, so its content does not touch the panel
+    // edges. The left one doubles as the resize grip.
+    private const double SidePadding = 12;
 
     // Google Calendar's desktop layout needs about this many CSS pixels across before
     // its header and side menu stop being cut off. A narrower panel is zoomed out to fit.
-    private const double PageLayoutWidth = 960;
+    private const double PageLayoutWidth = 1040;
+
+    // The week and day grids have a fixed height of about this many CSS pixels (24 hour
+    // rows plus the header). Zoomed out further than the panel height allows, the grid
+    // ends short of the bottom of the panel.
+    private const double PageGridHeight = 1320;
     private const double MinZoom = 0.5;
 
     // A click on the Dock band first takes focus away (which hides the flyout) and then
@@ -101,7 +108,9 @@ internal sealed class FlyoutWindow : Window
     private DateTime _hiddenAt = DateTime.MinValue;
     private bool _browserStarted;
     private bool _signingIn;
-    private double _panelWidth = LoadPanelWidth();
+
+    // Null until the user has resized the panel; the default then depends on the screen.
+    private double? _panelWidth = LoadPanelWidth();
 
     public FlyoutWindow(bool pinned)
     {
@@ -116,7 +125,8 @@ internal sealed class FlyoutWindow : Window
         // resize grip is a strip of the panel's own surface to its left.
         var grip = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0x30, 0x80, 0x80, 0x80)),
+            // Transparent, not null: an element without a background gets no mouse input.
+            Background = Brushes.Transparent,
             Cursor = System.Windows.Input.Cursors.SizeWE,
             ToolTip = "Drag to resize",
         };
@@ -132,8 +142,9 @@ internal sealed class FlyoutWindow : Window
         };
 
         var layout = new Grid();
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(GripWidth) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SidePadding) });
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SidePadding) });
         Grid.SetColumn(_web, 1);
         layout.Children.Add(grip);
         layout.Children.Add(_web);
@@ -164,7 +175,9 @@ internal sealed class FlyoutWindow : Window
     private void ShowFlyout()
     {
         var dark = IsDarkTheme();
-        Background = new SolidColorBrush(dark ? Color.FromRgb(0x1F, 0x1F, 0x1F) : Colors.White);
+
+        // Google Calendar's page background, so the side margins blend into the page.
+        Background = new SolidColorBrush(dark ? Color.FromRgb(0x1B, 0x1B, 0x1B) : Color.FromRgb(0xF8, 0xFA, 0xFD));
 
         var handle = new WindowInteropHelper(this).EnsureHandle();
         Native.ApplyFlyoutChrome(handle, dark);
@@ -230,8 +243,8 @@ internal sealed class FlyoutWindow : Window
         {
             // Painted while the page loads, instead of a white flash in dark mode.
             _web.DefaultBackgroundColor = dark
-                ? System.Drawing.Color.FromArgb(0x1F, 0x1F, 0x1F)
-                : System.Drawing.Color.White;
+                ? System.Drawing.Color.FromArgb(0x1B, 0x1B, 0x1B)
+                : System.Drawing.Color.FromArgb(0xF8, 0xFA, 0xFD);
 
             var environment = await CoreWebView2Environment.CreateAsync(null, UserDataFolder);
             await _web.EnsureCoreWebView2Async(environment);
@@ -308,8 +321,20 @@ internal sealed class FlyoutWindow : Window
     private void Place(IntPtr handle)
     {
         var (_, work, scale) = Native.MonitorAt(_anchor);
-        var width = Math.Min((int)Math.Round(_panelWidth * scale), work.Width);
+        var panelWidth = _panelWidth ?? DefaultPanelWidth(work.Height / scale);
+        var width = Math.Min((int)Math.Round(panelWidth * scale), work.Width);
         Native.MoveWindow(handle, work.Right - width, work.Top, width, work.Height);
+    }
+
+    /// <summary>
+    /// The narrowest width at which the page both fits across and fills the panel from
+    /// top to bottom: the zoom that makes the hour grid as tall as the panel, applied to
+    /// the width the page layout needs.
+    /// </summary>
+    private static double DefaultPanelWidth(double panelHeight)
+    {
+        var zoom = Math.Clamp(panelHeight / PageGridHeight, MinZoom, 1.0);
+        return (PageLayoutWidth * zoom) + (2 * SidePadding);
     }
 
     /// <summary>While the grip is dragged, the panel's left edge follows the pointer.</summary>
@@ -325,19 +350,24 @@ internal sealed class FlyoutWindow : Window
 
     /// <summary>
     /// Zooms the page out when the panel is narrower than the layout Google Calendar
-    /// needs, so the whole page fits instead of being cut off at the sides.
+    /// needs, as far as the panel's height allows.
     /// </summary>
     private void ApplyZoom()
     {
-        if (_web.CoreWebView2 is null || ActualWidth <= GripWidth)
+        if (_web.CoreWebView2 is null || ActualWidth <= 2 * SidePadding)
         {
             return;
         }
 
-        _web.ZoomFactor = Math.Clamp((ActualWidth - GripWidth) / PageLayoutWidth, MinZoom, 1.0);
+        // Never zoom out past the point where the hour grid stops reaching the bottom.
+        // In a panel too narrow for that, Google Calendar switches to its own compact
+        // layout (fewer header buttons, a week grid that scrolls sideways).
+        var fitWidth = (ActualWidth - (2 * SidePadding)) / PageLayoutWidth;
+        var fillHeight = ActualHeight / PageGridHeight;
+        _web.ZoomFactor = Math.Clamp(Math.Max(fitWidth, fillHeight), MinZoom, 1.0);
     }
 
-    private static double LoadPanelWidth()
+    private static double? LoadPanelWidth()
     {
         try
         {
@@ -353,7 +383,7 @@ internal sealed class FlyoutWindow : Window
             // An unreadable file falls back to the default width.
         }
 
-        return DefaultPanelWidth;
+        return null;
     }
 
     private void SavePanelWidth()
@@ -361,7 +391,7 @@ internal sealed class FlyoutWindow : Window
         try
         {
             Directory.CreateDirectory(DataFolder);
-            File.WriteAllText(WidthFile, _panelWidth.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+            File.WriteAllText(WidthFile, (_panelWidth ?? 0).ToString("0", System.Globalization.CultureInfo.InvariantCulture));
         }
         catch (Exception)
         {

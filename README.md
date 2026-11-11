@@ -27,7 +27,7 @@ Then add the **Dock Web Calendar** band under Command Palette **Settings → Doc
 - Views are switched with Google Calendar's own shortcuts: `M` month, `W` week, `D` day, `A` schedule, `T` today. Google remembers the view you used last.
 - Once created, the panel is kept when closed, so it reopens at once on the page as you left it.
 - Links that want a new window, such as a Meet call or an attachment, open in your default browser.
-- Drag the strip on the panel's left edge to resize it; the width is remembered. Google Calendar's desktop page needs about 960 pixels across, so a narrower panel is zoomed out to fit instead of cutting the page off at the sides. Widen the panel for larger text.
+- Drag the panel's left margin to resize it; the width is remembered. The default width is the narrowest at which Google Calendar's desktop page both fits across (about 1040 pixels) and fills the panel from top to bottom. A narrower panel still fills the height, and Google Calendar switches to its own compact layout: fewer header buttons, no side menu button, and a week grid that scrolls sideways. The Day view (`D`) suits a narrow panel best.
 
 ## Run without Command Palette
 
