@@ -136,7 +136,19 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
 
     public override ICommandItem[]? GetDockBands() => [_dockItem];
 
-    private static string DateText() => $"{DateTime.Now:M} ({DateTime.Now:ddd})";
+    private static string DateText() => ShortDate(DateTime.Now);
+
+    /// <summary>
+    /// The date as short as the culture allows, because the Dock cuts long band titles
+    /// off: the culture's month-and-day pattern with the month abbreviated, then the
+    /// weekday. "Nov 10 (Tue)" in English, "11월 10일 (화)" in Korean.
+    /// </summary>
+    internal static string ShortDate(DateTime date)
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        var monthDay = culture.DateTimeFormat.MonthDayPattern.Replace("MMMM", "MMM");
+        return $"{date.ToString(monthDay, culture)} ({date.ToString("ddd", culture)})";
+    }
 
     public override void Dispose()
     {

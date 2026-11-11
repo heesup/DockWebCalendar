@@ -33,7 +33,7 @@ Then add the **Dock Web Calendar** band under Command Palette **Settings → Doc
 
 ## Settings
 
-Right-click the **Dock Web Calendar** band on the Dock and choose **Settings**. The same entry is in the context menu of the **Dock Web Calendar** command in the palette, and under Command Palette **Settings → Extensions → Dock Web Calendar**. The context menu belongs to the extension's band; an app icon pinned to the Dock does not have it.
+Right-click the **Dock Web Calendar** band on the Dock and choose **Settings**. The same entry is in the context menu of the **Dock Web Calendar** command in the palette, and under Command Palette **Settings → Extensions → Dock Web Calendar**.
 
 | After the panel closes | Memory | Opening |
 |---|---|---|
@@ -57,10 +57,6 @@ dotnet run --project DockWebCalendar -c Release -- --pin
 - The sign-in (cookies) is stored in `%LocalAppData%\DockWebCalendar\WebView2`, separate from Edge and Chrome. To sign out, sign out of the Google account inside the panel or delete that folder.
 - Google sometimes blocks sign-in from embedded browsers as "not secure". WebView2 usually passes, but that is up to Google's policy.
 - While the panel is open, the WebView2 browser processes use about 650 MB. The sign-in is kept in the profile folder, so closing the browser does not sign you out.
-
-## Pinning the app instead of the band
-
-- The app itself can also be pinned to the Dock or Start. Each click then starts the exe, which only signals the running extension to open or close its window and exits, so there is still a single window. The **Dock Web Calendar** band is the better choice: it shows the date and needs no extra process per click.
 
 ## License
 
