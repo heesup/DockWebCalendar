@@ -58,6 +58,10 @@ dotnet run --project DockWebCalendar -c Release -- --pin
 - Google sometimes blocks sign-in from embedded browsers as "not secure". WebView2 usually passes, but that is up to Google's policy.
 - While the panel is open, the WebView2 browser processes use about 650 MB. The sign-in is kept in the profile folder, so closing the browser does not sign you out.
 
+## Acknowledgements
+
+The overall structure of this extension (a Command Palette Dock band backed by an out-of-process COM server, and the build and install scripts) is inspired by and adapted from [AI Usage Dock](https://github.com/GChavez0210/AIUsageDock) by Gabriel Chavez.
+
 ## License
 
 [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use, modify and redistribute this software for any noncommercial purpose, as long as you pass on the license terms and the notice below. Commercial use is not permitted. This is a source-available license, not an OSI-approved open source one.
