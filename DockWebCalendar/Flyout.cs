@@ -60,6 +60,19 @@ internal sealed class FlyoutHost
             _window.Hidden += (_, _) => application.Shutdown();
         }
 
+        else
+        {
+            // Hosted by Command Palette: load the page in the background shortly after
+            // start-up, so the first click on the band opens a panel that is already drawn.
+            var warmUp = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            warmUp.Tick += (_, _) =>
+            {
+                warmUp.Stop();
+                _window.WarmUp();
+            };
+            warmUp.Start();
+        }
+
         _ready.Set();
         application.Run();
     }
@@ -110,6 +123,7 @@ internal sealed class FlyoutWindow : Window
     private DateTime _hiddenAt = DateTime.MinValue;
     private bool _browserStarted;
     private bool _signingIn;
+    private bool _warming;
 
     // Null until the user has resized the panel.
     private double? _panelWidth = LoadPanelWidth();
@@ -183,6 +197,15 @@ internal sealed class FlyoutWindow : Window
 
     public void Toggle(Native.POINT cursor)
     {
+        // Still loading off-screen: bring that same window into view instead.
+        if (_warming)
+        {
+            _warming = false;
+            _anchor = cursor;
+            ShowFlyout();
+            return;
+        }
+
         if (IsVisible)
         {
             HideFlyout();
@@ -223,6 +246,43 @@ internal sealed class FlyoutWindow : Window
         }
     }
 
+    /// <summary>
+    /// Starts the browser and loads the calendar before the panel is first opened.
+    /// WebView2 is only created once its window has been shown, so the panel is shown
+    /// far off-screen without taking focus, and hidden again when the page has loaded.
+    /// </summary>
+    public void WarmUp()
+    {
+        if (_browserStarted || IsVisible)
+        {
+            return;
+        }
+
+        var dark = IsDarkTheme();
+        Background = new SolidColorBrush(dark ? Color.FromRgb(0x1B, 0x1B, 0x1B) : Color.FromRgb(0xF8, 0xFA, 0xFD));
+        _anchor = Native.CursorPosition();
+        var handle = new WindowInteropHelper(this).EnsureHandle();
+        Native.ApplyFlyoutChrome(handle, dark);
+
+        _warming = true;
+        ShowActivated = false;
+        Place(handle, offScreen: true);
+        Show();
+        Place(handle, offScreen: true);
+        ShowActivated = true;
+
+        _browserStarted = true;
+        _ = StartBrowserAsync(dark);
+    }
+
+    private void EndWarmUp()
+    {
+        if (_warming)
+        {
+            _warming = false;
+            Hide();
+        }
+    }
     private void HideFlyout()
     {
         if (!IsVisible)
@@ -242,7 +302,7 @@ internal sealed class FlyoutWindow : Window
         // Signing in takes focus away more than once: a passkey or Windows Hello prompt,
         // a password manager, a phone-code app. Hiding then would abandon the sign-in,
         // so the panel stays until it is toggled from the Dock or closed with Alt+F4.
-        if (!_pinned && !_signingIn)
+        if (!_pinned && !_signingIn && !_warming)
         {
             HideFlyout();
         }
@@ -282,6 +342,7 @@ internal sealed class FlyoutWindow : Window
             core.NewWindowRequested += OnNewWindowRequested;
             core.NavigationStarting += OnNavigationStarting;
             core.SourceChanged += OnSourceChanged;
+            core.NavigationCompleted += (_, _) => EndWarmUp();
             ApplyZoom();
             core.Navigate(CalendarUrl);
         }
@@ -289,6 +350,7 @@ internal sealed class FlyoutWindow : Window
         {
             // Most likely the WebView2 runtime is missing or its data folder is locked.
             _browserStarted = false;
+            EndWarmUp();
             Content = new TextBlock
             {
                 Text = "Google Calendar could not be loaded.\n\n" + exception.Message,
@@ -344,12 +406,14 @@ internal sealed class FlyoutWindow : Window
     /// Docks the window to the right edge of the monitor the pointer is on, filling the
     /// work area from top to bottom, like the macOS Notification Centre sidebar.
     /// </summary>
-    private void Place(IntPtr handle)
+    private void Place(IntPtr handle, bool offScreen = false)
     {
         var (_, work, scale) = Native.MonitorAt(_anchor);
         var panelWidth = _panelWidth ?? DefaultPanelWidth;
         var width = Math.Min((int)Math.Round(panelWidth * scale), work.Width);
-        Native.MoveWindow(handle, work.Right - width, work.Top, width, work.Height);
+
+        // Off-screen keeps the real size, so the page is laid out as it will be shown.
+        Native.MoveWindow(handle, offScreen ? -32000 : work.Right - width, offScreen ? -32000 : work.Top, width, work.Height);
     }
 
     /// <summary>While the grip is dragged, the panel's left edge follows the pointer.</summary>

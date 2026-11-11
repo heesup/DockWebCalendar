@@ -25,7 +25,7 @@ Then add the **Dock Web Calendar** band under Command Palette **Settings → Doc
 - Click the band to open the panel. The first time, it shows the Google sign-in form; after one sign-in you stay signed in.
 - To close it, click outside the panel or click the band again. While a Google sign-in page is showing, the panel stays open when it loses focus, so a passkey prompt, password manager or code app does not interrupt the sign-in; close it with the band or `Alt+F4`.
 - Views are switched with Google Calendar's own shortcuts: `M` month, `W` week, `D` day, `A` schedule, `T` today. Google remembers the view you used last.
-- Once created, the panel is kept when closed, so it reopens at once on the page as you left it.
+- The page is loaded in the background a few seconds after Command Palette starts, and kept when the panel is closed, so the panel opens at once, on the page as you left it.
 - Links that want a new window, such as a Meet call or an attachment, open in your default browser.
 - Drag the handle (the two bars) on the panel's left edge to resize it; the width is remembered. The default width is what Google Calendar's desktop page needs at full size, about 1040 pixels. A narrower panel still fills the height, and Google Calendar switches to its own compact layout: fewer header buttons, no side menu button, and a week grid that scrolls sideways.
 
@@ -42,7 +42,7 @@ dotnet run --project DockWebCalendar -c Release -- --pin
 - `calendar.google.com` refuses to be embedded in an iframe (X-Frame-Options), so the WebView2 navigates to it directly instead.
 - The sign-in (cookies) is stored in `%LocalAppData%\DockWebCalendar\WebView2`, separate from Edge and Chrome. To sign out, sign out of the Google account inside the panel or delete that folder.
 - Google sometimes blocks sign-in from embedded browsers as "not secure". WebView2 usually passes, but that is up to Google's policy.
-- The WebView2 processes start the first time the panel opens and stay in memory while Command Palette is running.
+- The WebView2 processes start shortly after Command Palette does and stay in memory while it is running, about 650 MB with Google Calendar loaded.
 
 ## License
 
