@@ -4,6 +4,12 @@ A PowerToys Command Palette extension that puts today's date on the Dock and, wh
 
 It is the simpler sibling of [DockCalendar](https://github.com/heesup/DockCalendar). Instead of drawing its own calendar it shows the Google Calendar web app, so there is no OAuth client to set up, and everything the web app can do works, including adding, editing and deleting events.
 
+## Screenshot
+
+The panel on first run, before signing in. It is docked to the right edge and as tall as the screen's work area.
+
+<img src="screenshots/sign-in.png" alt="The full-height side panel showing the Google sign-in form for Google Calendar" width="320">
+
 ## Install
 
 Requirements: Windows 11, PowerToys Command Palette 0.9 or newer with the Dock enabled, and the .NET 10 SDK (`10.0.401` or later). The WebView2 runtime ships with Windows 11.
