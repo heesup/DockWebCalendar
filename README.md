@@ -37,7 +37,7 @@ To build without installing, run `./build.ps1`.
 ./build-and-install.ps1
 ```
 
-This builds, publishes, registers the package for the current user in development mode and restarts Command Palette. Then add the **Dock Web Calendar** band under Command Palette **Settings → Dock → Bands**. Enabling the extension does not put the band on the Dock by itself.
+This builds, publishes, registers the package for the current user in development mode and restarts Command Palette. Then add the **Date (Google Calendar)** band, listed under **Dock Web Calendar**, in Command Palette **Settings → Dock → Bands**. Enabling the extension does not put the band on the Dock by itself.
 
 ## Use
 
@@ -50,7 +50,7 @@ This builds, publishes, registers the package for the current user in developmen
 
 ## Settings
 
-Right-click the **Dock Web Calendar** band on the Dock and choose **Settings**. The same entry is in the context menu of the **Dock Web Calendar** command in the palette, and under Command Palette **Settings → Extensions → Dock Web Calendar**.
+Right-click the **Date (Google Calendar)** band on the Dock and choose **Settings**. The same settings are under Command Palette **Settings → Extensions → Dock Web Calendar**.
 
 | After the panel closes | Memory | Opening |
 |---|---|---|

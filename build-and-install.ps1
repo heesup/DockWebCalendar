@@ -49,4 +49,4 @@ $installed = Get-AppxPackage -Name "DockWebCalendar"
 if (-not $installed) { throw "Dock Web Calendar was not found after installation" }
 
 Write-Host "Installed Dock Web Calendar $($installed.Version)."
-Write-Host "Add its band under Command Palette Settings -> Dock -> Bands -> Dock Web Calendar."
+Write-Host "Add its 'Date (Google Calendar)' band under Command Palette Settings -> Dock -> Bands -> Dock Web Calendar."

@@ -7,7 +7,10 @@ namespace DockWebCalendar;
 
 public static class Program
 {
+    // The extension, the command its band runs, and the band as listed under Edit Dock.
     internal const string ProductName = "Dock Web Calendar";
+    internal const string CommandName = "Google Calendar";
+    internal const string BandName = "Date (Google Calendar)";
 
     [MTAThread]
     public static int Main(string[] args)
@@ -85,7 +88,6 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
     private readonly FlyoutHost _host;
     private readonly ListItem _bandItem;
     private readonly WrappedDockItem _dockItem;
-    private readonly ICommandItem[] _commands;
     private readonly Timer _dateTimer;
 
     public DockWebCalendarCommandsProvider()
@@ -104,8 +106,7 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
 
         var toggle = new ToggleCommand(_host);
 
-        // Settings live in the context menu (right-click the Dock band, or the command's
-        // "more" menu in the palette) rather than as a second entry in the command list.
+        // Settings live in the band's context menu (right-click it on the Dock).
         IContextItem[] contextCommands =
         [
             new CommandContextItem(_settings.ToolkitSettings.SettingsPage)
@@ -115,24 +116,17 @@ public sealed partial class DockWebCalendarCommandsProvider : CommandProvider, I
                 Icon = new IconInfo(""),
             },
         ];
-        _bandItem = new ListItem(toggle) { Icon = new IconInfo(""), Title = DateText(), MoreCommands = contextCommands };
-        _dockItem = new WrappedDockItem([_bandItem], "dockwebcalendar.dock.calendar", Program.ProductName);
-        _commands =
-        [
-            new CommandItem(toggle)
-            {
-                Title = Program.ProductName,
-                Subtitle = "Google Calendar",
-                MoreCommands = contextCommands,
-                Icon = new IconInfo(""),
-            },
-        ];
+        // The band is text only. Its command carries no icon either, because Command Palette
+        // falls back to the command's icon when the item has none.
+        _bandItem = new ListItem(toggle) { Title = DateText(), MoreCommands = contextCommands };
+        _dockItem = new WrappedDockItem([_bandItem], "dockwebcalendar.dock.calendar", Program.BandName);
 
         // The band text is set in place; ItemsChanged would make Command Palette rebuild the whole Dock.
         _dateTimer = new Timer(_ => _bandItem.Title = DateText(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
-    public override ICommandItem[] TopLevelCommands() => _commands;
+    // The extension is its Dock band only: nothing is listed in the palette.
+    public override ICommandItem[] TopLevelCommands() => [];
 
     public override ICommandItem[]? GetDockBands() => [_dockItem];
 
@@ -166,8 +160,7 @@ internal sealed partial class ToggleCommand : InvokableCommand
     {
         _host = host;
         Id = "dockwebcalendar.command.toggle";
-        Name = Program.ProductName;
-        Icon = new IconInfo("");
+        Name = Program.CommandName;
     }
 
     public override ICommandResult Invoke()
