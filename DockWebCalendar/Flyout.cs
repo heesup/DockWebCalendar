@@ -125,6 +125,7 @@ internal sealed class FlyoutWindow : Window
     private Native.POINT _focusLostCursor;
     private bool _browserStarted;
     private bool _signingIn;
+    private OutsideClickWatcher? _outsideClicks;
 
     // Null until the user has resized the panel.
     private double? _panelWidth = LoadPanelWidth();
@@ -234,6 +235,12 @@ internal sealed class FlyoutWindow : Window
         Activate();
         _web.Focus();
 
+        if (!_pinned)
+        {
+            _outsideClicks ??= new OutsideClickWatcher(handle, OnOutsideClick);
+            _outsideClicks.Start();
+        }
+
         _releaseTimer.Stop();
         if (!_browserStarted)
         {
@@ -299,6 +306,7 @@ internal sealed class FlyoutWindow : Window
             return;
         }
 
+        _outsideClicks?.Stop();
         Hide();
         _hiddenAt = DateTime.UtcNow;
         ScheduleBrowserRelease();
@@ -348,6 +356,26 @@ internal sealed class FlyoutWindow : Window
         {
             HideFlyout();
         }
+    }
+
+    /// <summary>
+    /// A click outside the panel closes it even when the panel never had focus, which
+    /// happens when Windows refuses to hand it focus as it opens from the Dock. Runs
+    /// inside the mouse hook, so the hiding is queued.
+    /// </summary>
+    private void OnOutsideClick(Native.POINT point)
+    {
+        // Recorded like a focus loss, so a click on the Dock band closes the panel
+        // instead of closing it and then reopening it.
+        _focusLostAt = DateTime.UtcNow;
+        _focusLostCursor = point;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!_signingIn)
+            {
+                HideFlyout();
+            }
+        });
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
